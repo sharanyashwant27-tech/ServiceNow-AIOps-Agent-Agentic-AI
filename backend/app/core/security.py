@@ -20,7 +20,8 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(subject: str, claims: dict[str, Any] | None = None) -> str:
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload: dict[str, Any] = {"sub": subject, "exp": expire}
+    # python-jose expects exp as a Unix timestamp (int), not a datetime object
+    payload: dict[str, Any] = {"sub": subject, "exp": int(expire.timestamp())}
     if claims:
         payload.update(claims)
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)

@@ -7,6 +7,15 @@ function authHeaders(): HeadersInit {
     : { "Content-Type": "application/json" };
 }
 
+function clearSessionAndRedirect() {
+  localStorage.removeItem("token");
+  // Notify auth hook / other tabs
+  window.dispatchEvent(new Event("aiops:auth-cleared"));
+  if (!window.location.pathname.startsWith("/login")) {
+    window.location.replace("/login");
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     ...init,
@@ -17,7 +26,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const detail = contentType.includes("application/json")
       ? await res.json().catch(() => ({}))
       : {};
-    throw new Error((detail as { detail?: string }).detail || res.statusText || `HTTP ${res.status}`);
+    const message =
+      (detail as { detail?: string }).detail || res.statusText || `HTTP ${res.status}`;
+    // Expired / invalid JWT — drop session and send user to login
+    if (res.status === 401 && path !== "/auth/login") {
+      clearSessionAndRedirect();
+    }
+    throw new Error(message);
   }
   if (!contentType.includes("application/json")) {
     throw new Error(`Expected JSON from ${path}, got ${contentType || "unknown content type"}`);
@@ -72,6 +87,7 @@ export const api = {
       body: form,
     });
     if (!res.ok) {
+      if (res.status === 401) clearSessionAndRedirect();
       const detail = await res.json().catch(() => ({}));
       throw new Error(detail.detail || res.statusText);
     }

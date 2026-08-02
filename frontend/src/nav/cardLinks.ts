@@ -1,19 +1,42 @@
 /** Central href map so dashboard/architecture/workflow cards land on the right page. */
 
 export const OPEN_STATES = new Set([
+  "New",
+  "Assigned",
+  "Work In Progress",
+  "Waiting for Customer",
+  // legacy uppercase codes
   "NEW",
   "ASSIGNED",
   "WORK IN PROGRESS",
   "WAITING FOR CUSTOMER",
 ]);
 
-export const CLOSED_STATES = new Set(["RESOLVED", "COMPLETED", "CLOSED"]);
+export const CLOSED_STATES = new Set([
+  "Resolved",
+  "Completed",
+  "Closed",
+  "RESOLVED",
+  "COMPLETED",
+  "CLOSED",
+]);
 
 export const DASHBOARD_CARD_HREFS: Record<string, string> = {
+  tickets_created: "/tickets",
   open_tickets: "/tickets?status=open",
-  p1_tickets: "/tickets?priority=P1&status=open",
-  p2_tickets: "/tickets?priority=P2&status=open",
-  p3_tickets: "/tickets?priority=P3&status=open",
+  p1_tickets: "/tickets?priority=P1",
+  p2_tickets: "/tickets?priority=P2",
+  p3_tickets: "/tickets?priority=P3",
+  priority_p1: "/tickets?priority=P1",
+  priority_p2: "/tickets?priority=P2",
+  priority_p3: "/tickets?priority=P3",
+  status_new: "/tickets?state=New",
+  status_assigned: "/tickets?state=Assigned",
+  status_work_in_progress: "/tickets?state=Work%20In%20Progress",
+  status_waiting_for_customer: "/tickets?state=Waiting%20for%20Customer",
+  status_resolved: "/tickets?state=Resolved",
+  status_completed: "/tickets?state=Completed",
+  status_closed: "/tickets?state=Closed",
   resolved_today: "/tickets?resolved=today",
   sla_breaches: "/tickets?sla=breached",
   average_resolution_time: "/tickets?status=closed",

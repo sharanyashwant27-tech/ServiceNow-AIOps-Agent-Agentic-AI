@@ -7,9 +7,12 @@ services:
       args:
         APP_VERSION: "1.0.0"
     ports:
-      - "8910:8910"
+      # Bind IPv4 loopback so Windows localhost does not hang on broken ::1 forwarding
+      - "127.0.0.1:8910:8910"
     environment:
       PORT: 8910
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-servicenow-aiops-agentic}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-10080}
       DATABASE_URL: postgresql+asyncpg://aiops:aiops@postgres:5432/aiops
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333

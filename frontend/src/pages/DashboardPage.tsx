@@ -16,22 +16,52 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Link } from "react-router-dom";
 import ClickableCard from "../components/ClickableCard";
 import { DASHBOARD_CARD_HREFS, DASHBOARD_CHART_HREFS } from "../nav/cardLinks";
 import { api } from "../services/api";
+import {
+  formatDateShort,
+  ticketAssignment,
+  ticketCompletedAt,
+  ticketCreatedAt,
+  ticketStatus,
+} from "../utils/dates";
 
-const COLORS = ["#0f6e56", "#c45d26", "#1f4b7a", "#8a6d3b", "#5b4b8a", "#7a3b4b", "#2f6f8f"];
+const COLORS = ["#00b4a0", "#ff5a7a", "#0088cc", "#ff9f1c", "#12b76a", "#0ea5e9", "#e11d48"];
 
 const CARD_TONES: Record<string, string> = {
+  tickets_created: "tone-ai",
   open_tickets: "tone-neutral",
   p1_tickets: "tone-critical",
   p2_tickets: "tone-major",
   p3_tickets: "tone-minor",
+  priority_p1: "tone-critical",
+  priority_p2: "tone-major",
+  priority_p3: "tone-minor",
   resolved_today: "tone-good",
   sla_breaches: "tone-critical",
   average_resolution_time: "tone-neutral",
   agent_performance: "tone-ai",
+  status_new: "tone-neutral",
+  status_assigned: "tone-minor",
+  status_work_in_progress: "tone-major",
+  status_waiting_for_customer: "tone-major",
+  status_resolved: "tone-good",
+  status_completed: "tone-good",
+  status_closed: "tone-neutral",
 };
+
+function cardHref(card: { id?: string; kind?: string; filter?: string; title?: string }): string {
+  if (card.id && DASHBOARD_CARD_HREFS[card.id]) return DASHBOARD_CARD_HREFS[card.id];
+  if (card.kind === "status" && card.filter) {
+    return `/tickets?state=${encodeURIComponent(card.filter)}`;
+  }
+  if (card.kind === "priority" && card.filter) {
+    return `/tickets?priority=${encodeURIComponent(card.filter)}`;
+  }
+  return "/tickets";
+}
 
 function shortDate(iso: string) {
   if (!iso) return "";
@@ -72,6 +102,11 @@ export default function DashboardPage() {
   if (!data) return <p>Loading dashboards…</p>;
 
   const cards = data.ticket_dashboard?.cards || [];
+  const statusCards = data.ticket_dashboard?.status_cards || [];
+  const priorityCards = data.ticket_dashboard?.priority_cards || [];
+  const matrix = data.ticket_dashboard?.status_priority_matrix || [];
+  const recentTickets = data.ticket_dashboard?.recent_tickets || [];
+  const ticketsCreated = data.ticket_dashboard?.tickets_created ?? cards.find((c: any) => c.id === "tickets_created")?.value ?? "—";
   const charts = data.charts || data.ticket_dashboard?.charts || {};
 
   const ticketTrend = (charts.ticket_trend || []).map((r: any) => ({
@@ -100,7 +135,7 @@ export default function DashboardPage() {
         {cards.map((card: any) => (
           <ClickableCard
             key={card.id}
-            to={DASHBOARD_CARD_HREFS[card.id] || "/tickets"}
+            to={cardHref(card)}
             className={`dash-card ${CARD_TONES[card.id] || "tone-neutral"}`}
             title={`Open ${card.title}`}
           >
@@ -110,16 +145,125 @@ export default function DashboardPage() {
         ))}
       </section>
 
+      <h2 className="section-title">Tickets created · {ticketsCreated}</h2>
+      <p className="hint" style={{ marginTop: "-0.35rem" }}>
+        Counts for every status and priority across all created tickets.
+      </p>
+
+      <h3 className="subsection-title">By status</h3>
+      <section className="dashboard-cards status-cards">
+        {statusCards.map((card: any) => (
+          <ClickableCard
+            key={card.id}
+            to={cardHref(card)}
+            className={`dash-card ${CARD_TONES[card.id] || "tone-neutral"}`}
+            title={`Tickets in ${card.title}`}
+          >
+            <span>{card.title}</span>
+            <strong>{card.value}</strong>
+          </ClickableCard>
+        ))}
+        {!statusCards.length && <p className="hint">No status counts yet.</p>}
+      </section>
+
+      <h3 className="subsection-title">By priority</h3>
+      <section className="dashboard-cards priority-cards">
+        {priorityCards.map((card: any) => (
+          <ClickableCard
+            key={card.id}
+            to={cardHref(card)}
+            className={`dash-card ${CARD_TONES[card.id] || "tone-neutral"}`}
+            title={`${card.title}`}
+          >
+            <span>{card.title}</span>
+            <strong>{card.value}</strong>
+          </ClickableCard>
+        ))}
+      </section>
+
+      {matrix.length > 0 && (
+        <section className="panel" style={{ marginBottom: "1rem" }}>
+          <ClickableCard to="/tickets" className="panel-link-header" title="Open Tickets">
+            <h2>Status × Priority</h2>
+            <span className="panel-link-cta">View →</span>
+          </ClickableCard>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>P1</th>
+                <th>P2</th>
+                <th>P3</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.map((row: any) => (
+                <tr key={row.status}>
+                  <td>{row.status}</td>
+                  <td>{row.P1}</td>
+                  <td>{row.P2}</td>
+                  <td>{row.P3}</td>
+                  <td>
+                    <strong>{row.total}</strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      <section className="panel" style={{ marginBottom: "1rem" }}>
+        <ClickableCard to="/tickets" className="panel-link-header" title="Open Tickets">
+          <h2>Recent tickets</h2>
+          <span className="panel-link-cta">View all →</span>
+        </ClickableCard>
+        <table className="table tickets-table">
+          <thead>
+            <tr>
+              <th>Number</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Assignment</th>
+              <th>Created</th>
+              <th>Completed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentTickets.map((t: any) => (
+              <tr key={t.id}>
+                <td>
+                  <Link to={`/tickets/${t.id}`}>{t.number}</Link>
+                </td>
+                <td>{t.title}</td>
+                <td>
+                  <span className="status-chip">{ticketStatus(t)}</span>
+                </td>
+                <td>
+                  <span className={`pill p-${t.priority}`}>{t.priority}</span>
+                </td>
+                <td>{ticketAssignment(t)}</td>
+                <td>{formatDateShort(ticketCreatedAt(t))}</td>
+                <td>{formatDateShort(ticketCompletedAt(t))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!recentTickets.length && <p className="hint">No tickets created yet.</p>}
+      </section>
+
       <h2 className="section-title">Charts</h2>
       <div className="grid-2">
         <ChartPanel chartId="ticket_trend" title="Ticket Trend">
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={ticketTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Area type="monotone" dataKey="created" name="Created" stroke="#1f4b7a" fill="#c5d5ea" />
+              <Area type="monotone" dataKey="created" name="Created" stroke="#0088cc" fill="#9fe0ff" />
             </AreaChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -127,11 +271,11 @@ export default function DashboardPage() {
         <ChartPanel chartId="resolution_trend" title="Resolution Trend">
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={resolutionTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Line type="monotone" dataKey="resolved" name="Resolved" stroke="#0f6e56" strokeWidth={2} />
+              <Line type="monotone" dataKey="resolved" name="Resolved" stroke="#12b76a" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -153,13 +297,13 @@ export default function DashboardPage() {
         <ChartPanel chartId="engineer_workload" title="Engineer Workload">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={engineerWorkload}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="workload" name="Workload" fill="#c45d26" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="capacity" name="Capacity" fill="#9bb0c4" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="workload" name="Workload" fill="#ff5a7a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="capacity" name="Capacity" fill="#00b4a0" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -169,7 +313,7 @@ export default function DashboardPage() {
             <PieChart>
               <Pie data={slaCompliance} dataKey="value" nameKey="name" outerRadius={90} label>
                 {slaCompliance.map((row: any, i: number) => (
-                  <Cell key={i} fill={row.name === "Breached" ? "#c45d26" : "#0f6e56"} />
+                  <Cell key={i} fill={row.name === "Breached" ? "#e11d48" : "#12b76a"} />
                 ))}
               </Pie>
               <Tooltip />
@@ -182,11 +326,11 @@ export default function DashboardPage() {
         <ChartPanel chartId="knowledge_base_usage" title="Knowledge Base Usage">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={kbUsage} layout="vertical" margin={{ left: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis type="number" allowDecimals={false} />
               <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
               <Tooltip />
-              <Bar dataKey="value" name="Documents" fill="#5b4b8a" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="value" name="Documents" fill="#ff9f1c" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -194,11 +338,11 @@ export default function DashboardPage() {
         <ChartPanel chartId="ai_confidence_scores" title="AI Confidence Scores">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={aiConfidence}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="value" name="Tickets" fill="#1f4b7a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" name="Tickets" fill="#0088cc" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartPanel>
@@ -206,11 +350,11 @@ export default function DashboardPage() {
         <ChartPanel chartId="ai_confidence_by_agent" title="AI Confidence by Agent">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={aiByAgent}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis domain={[0, 100]} />
               <Tooltip />
-              <Bar dataKey="confidence" name="Avg %" fill="#0f6e56" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="confidence" name="Avg %" fill="#00b4a0" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartPanel>

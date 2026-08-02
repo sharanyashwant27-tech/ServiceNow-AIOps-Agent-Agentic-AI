@@ -2,6 +2,13 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import ClickableCard from "../components/ClickableCard";
 import { api } from "../services/api";
+import {
+  formatDate,
+  ticketAssignment,
+  ticketCompletedAt,
+  ticketCreatedAt,
+  ticketStatus,
+} from "../utils/dates";
 
 function capabilityHref(c: { id?: string; endpoint?: string; agent?: string }): string {
   const id = (c.id || "").toLowerCase();
@@ -187,11 +194,37 @@ export default function AutomationPage() {
             <button>Auto-create & triage</button>
           </form>
           {created && (
-            <p className="hint">
-              Created{" "}
-              <Link to={`/tickets/${created.ticket.id}`}>{created.ticket.number}</Link> · {created.ticket.priority} ·{" "}
-              {created.ticket.assigned_to} · confidence {Math.round(created.overall_confidence * 100)}%
-            </p>
+            <div className="created-ticket-meta">
+              <p className="hint">
+                Created <Link to={`/tickets/${created.ticket.id}`}>{created.ticket.number}</Link>
+              </p>
+              <dl className="kv compact-kv">
+                <div>
+                  <dt>Status</dt>
+                  <dd>{ticketStatus(created.ticket)}</dd>
+                </div>
+                <div>
+                  <dt>Priority</dt>
+                  <dd>{created.ticket.priority}</dd>
+                </div>
+                <div>
+                  <dt>Assignment</dt>
+                  <dd>{ticketAssignment(created.ticket)}</dd>
+                </div>
+                <div>
+                  <dt>Created</dt>
+                  <dd>{formatDate(ticketCreatedAt(created.ticket))}</dd>
+                </div>
+                <div>
+                  <dt>Completed</dt>
+                  <dd>{formatDate(ticketCompletedAt(created.ticket))}</dd>
+                </div>
+                <div>
+                  <dt>AI confidence</dt>
+                  <dd>{Math.round(created.overall_confidence * 100)}%</dd>
+                </div>
+              </dl>
+            </div>
           )}
         </section>
 
@@ -213,6 +246,10 @@ export default function AutomationPage() {
                     <strong>
                       {r.number || r.short_description} ({Math.round((r.score || 0) * 100)}%)
                     </strong>
+                    <span>
+                      {ticketStatus(r)} · {ticketAssignment(r)} · created {formatDate(ticketCreatedAt(r))}
+                      {ticketCompletedAt(r) ? ` · completed ${formatDate(ticketCompletedAt(r))}` : ""}
+                    </span>
                     <span>{r.ai_summary || r.short_description}</span>
                   </div>
                 </ClickableCard>

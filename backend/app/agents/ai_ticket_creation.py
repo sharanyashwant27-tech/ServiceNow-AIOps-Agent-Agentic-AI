@@ -238,6 +238,7 @@ class AITicketCreationAgent:
                 "Title": draft.title,
                 "Category": draft.category,
                 "Priority": draft.priority,
+                "Status": "New",
                 "Assignment": draft.assignment,
                 "SLA": draft.sla,
                 "Suggested Resolution": draft.suggested_resolution,

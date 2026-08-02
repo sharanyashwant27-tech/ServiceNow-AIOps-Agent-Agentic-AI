@@ -11,7 +11,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
-from app.infrastructure.db.seed import ensure_demo_engineers, reindex_knowledge, seed_if_empty
+from app.infrastructure.db.seed import (
+    ensure_demo_engineers,
+    ensure_demo_tickets,
+    reindex_knowledge,
+    seed_if_empty,
+)
 from app.infrastructure.db.session import AsyncSessionLocal, init_db
 from app.interfaces.api.routes import auth, automation, dashboard, metrics, stack, tickets
 
@@ -49,6 +54,7 @@ async def lifespan(_: FastAPI):
     async with AsyncSessionLocal() as session:
         await seed_if_empty(session)
         await ensure_demo_engineers(session)
+        await ensure_demo_tickets(session)
         await reindex_knowledge(session)
     stop = asyncio.Event()
     cron_task = None

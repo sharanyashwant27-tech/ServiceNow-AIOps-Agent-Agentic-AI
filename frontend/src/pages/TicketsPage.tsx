@@ -2,18 +2,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CLOSED_STATES, OPEN_STATES } from "../nav/cardLinks";
 import { api } from "../services/api";
-
-function isToday(iso: string | null | undefined): boolean {
-  if (!iso) return false;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return false;
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
+import {
+  formatDate,
+  formatDateShort,
+  isUtcToday,
+  ticketAssignment,
+  ticketCompletedAt,
+  ticketCreatedAt,
+  ticketResolvedAt,
+  ticketStatus,
+} from "../utils/dates";
 
 export default function TicketsPage() {
   const navigate = useNavigate();
@@ -52,8 +50,9 @@ export default function TicketsPage() {
       if (priority && t.priority !== priority) return false;
       if (sla === "breached" && !(t.sla_breached || t.sla?.breached)) return false;
       if (resolved === "today") {
-        const when = t.resolved_at || t.closed_at || t.updated_at;
-        if (!CLOSED_STATES.has(st) || !isToday(when)) return false;
+        // Match dashboard: closed-family status + resolution/completion timestamp on UTC "today"
+        const when = ticketResolvedAt(t);
+        if (!CLOSED_STATES.has(st) || !isUtcToday(when)) return false;
       }
       if (assigned && t.assigned_to !== assigned && !(t.assigned_to || "").startsWith(assigned)) {
         return false;
@@ -104,10 +103,11 @@ export default function TicketsPage() {
         sync_servicenow: true,
         use_ai_draft: true,
       });
+      const t = res.ticket;
       setMessage(
-        `Created ${res.ticket.number} · ${res.ticket.title || draft.title} · ${res.ticket.priority} · ${
-          res.ticket.assignment_group || draft.assignment
-        }`
+        `Created ${t.number} · status ${ticketStatus(t)} · ${t.priority} · assigned ${ticketAssignment(t)} · created ${formatDate(
+          ticketCreatedAt(t)
+        )}`
       );
       setDraft(null);
       setGenerated(null);
@@ -171,15 +171,27 @@ export default function TicketsPage() {
 
       <section className="panel">
         <div className="panel-link-header static">
-          <h2>Tickets{filterLabel ? ` · ${filtered.length}` : ""}</h2>
+          <h2>
+            {resolved === "today"
+              ? `Resolved today · ${filtered.length}`
+              : status === "closed"
+                ? `Closed tickets · ${filtered.length}`
+                : `Tickets${filterLabel ? ` · ${filtered.length}` : ""}`}
+          </h2>
           {filterLabel ? (
             <button type="button" className="ghost" onClick={() => setSearchParams({})}>
               Clear filter
             </button>
           ) : null}
         </div>
-        {filterLabel && <p className="hint">Filter: {filterLabel}</p>}
-        <table className="table">
+        {filterLabel && (
+          <p className="hint">
+            {resolved === "today"
+              ? "Showing Resolved / Completed / Closed tickets finished today (UTC), matching the dashboard card."
+              : `Filter: ${filterLabel}`}
+          </p>
+        )}
+        <table className="table tickets-table">
           <thead>
             <tr>
               <th>Number</th>
@@ -187,6 +199,8 @@ export default function TicketsPage() {
               <th>Priority</th>
               <th>Status</th>
               <th>Assignment</th>
+              <th>Created</th>
+              <th>Completed</th>
               <th>AI</th>
             </tr>
           </thead>
@@ -202,8 +216,12 @@ export default function TicketsPage() {
                 <td>
                   <span className={`pill p-${t.priority}`}>{t.priority}</span>
                 </td>
-                <td>{t.status || t.state}</td>
-                <td>{t.assignment_group || t.assigned_to || "—"}</td>
+                <td>
+                  <span className="status-chip">{ticketStatus(t)}</span>
+                </td>
+                <td>{ticketAssignment(t)}</td>
+                <td>{formatDateShort(ticketCreatedAt(t))}</td>
+                <td>{formatDateShort(ticketCompletedAt(t))}</td>
                 <td>{Math.round((t.ai_confidence || 0) * 100)}%</td>
               </tr>
             ))}

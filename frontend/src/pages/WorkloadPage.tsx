@@ -31,12 +31,12 @@ export default function WorkloadPage() {
         <div className="chart">
           <ResponsiveContainer width="100%" height={320}>
             <BarChart data={chart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#d7d2c8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#b7d4ea" />
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="workload" fill="#0f6e56" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="capacity" fill="#b7c4b1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="workload" fill="#ff5a7a" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="capacity" fill="#00b4a0" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

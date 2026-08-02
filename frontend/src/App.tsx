@@ -13,7 +13,8 @@ import ArchitecturePage from "./pages/ArchitecturePage";
 import WorkflowPage from "./pages/WorkflowPage";
 
 function Private({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+  const { token, ready } = useAuth();
+  if (!ready) return <p className="page">Checking session…</p>;
   if (!token) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     # Auth (JWT)
     secret_key: str = "change-me-in-production-servicenow-aiops-agentic"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 480
+    # Demo-friendly session length (7 days). Override via ACCESS_TOKEN_EXPIRE_MINUTES.
+    access_token_expire_minutes: int = 60 * 24 * 7
 
     # PostgreSQL (SQLite fallback for local)
     database_url: str = "sqlite+aiosqlite:///./aiops.db"

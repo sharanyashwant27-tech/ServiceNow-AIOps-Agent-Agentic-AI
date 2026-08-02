@@ -86,8 +86,11 @@ class TicketOut(BaseModel):
     category: str
     subcategory: str
     assigned_to: str | None
+    assignment_group: str = ""
+    assignment: str = "Unassigned"
     created_by: str = ""
     created_date: datetime | None = None
+    completed_date: datetime | None = None
     resolution_due: datetime | None = None
     work_notes: list[dict[str, Any]]
     attachments: list[dict[str, Any]]
@@ -100,7 +103,6 @@ class TicketOut(BaseModel):
     number: str
     short_description: str = ""
     state: str = ""
-    assignment_group: str = ""
     configuration_item: str | None = None
     caller: str = ""
     ai_confidence: float = 0.0
@@ -121,6 +123,10 @@ class TicketOut(BaseModel):
     updated_at: datetime | None = None
     resolved_at: datetime | None = None
     closed_at: datetime | None = None
+    created_date_iso: str | None = None
+    completed_date_iso: str | None = None
+    resolved_at_iso: str | None = None
+    closed_at_iso: str | None = None
 
 
 class EngineerOut(BaseModel):

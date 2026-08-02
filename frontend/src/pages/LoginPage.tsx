@@ -3,12 +3,13 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 export default function LoginPage() {
-  const { login, token } = useAuth();
+  const { login, token, ready } = useAuth();
   const [email, setEmail] = useState("admin@example.com");
   const [password, setPassword] = useState("admin123");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  if (!ready) return <p className="page">Checking session…</p>;
   if (token) return <Navigate to="/" replace />;
 
   async function onSubmit(e: FormEvent) {
@@ -25,8 +26,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <form className="login-panel" onSubmit={onSubmit}>
+    <div className="login-page" role="main">
+      <form className="login-panel" onSubmit={onSubmit} aria-label="Sign in">
         <p className="eyebrow">Enterprise AIOps</p>
         <h1>ServiceNow Agentic AI</h1>
         <p className="lede">Master-agent orchestration for triage, SLA, and CI root-cause analysis.</p>

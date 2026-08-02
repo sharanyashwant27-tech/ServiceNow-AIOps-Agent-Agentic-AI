@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -192,6 +193,71 @@ async def seed_if_empty(db: AsyncSession) -> None:
 
     for doc in docs:
         vector_store.index_document(doc.title, doc.content, source=doc.source, doc_id=doc.id)
+
+
+async def ensure_demo_tickets(db: AsyncSession) -> None:
+    """Seed sample tickets across all statuses and priorities when the table is empty."""
+    from app.domain.value_objects.ticket_state import TicketState
+    from app.infrastructure.db.models import TicketModel
+
+    existing = (await db.scalars(select(TicketModel).limit(1))).first()
+    if existing:
+        return
+
+    now = datetime.now(timezone.utc)
+    samples = [
+        ("INC1001", "VPN disconnects for remote users", "Network", TicketState.NEW.value, "P1", "ava.network@example.com", "Network Ops"),
+        ("INC1002", "Oracle deadlock on SAP batch", "Database", TicketState.ASSIGNED.value, "P1", "ben.db@example.com", "DBA Team"),
+        ("INC1003", "API Gateway 5xx spike", "Application", TicketState.WORK_IN_PROGRESS.value, "P2", "chloe.apps@example.com", "App Support"),
+        ("INC1004", "Outlook not opening after update", "Software", TicketState.WAITING_FOR_CUSTOMER.value, "P2", "sam.desktop@example.com", "Desktop Team"),
+        ("INC1005", "Password reset for contractor", "Access", TicketState.RESOLVED.value, "P3", "elena.sec@example.com", "SecOps"),
+        ("INC1006", "Kubernetes node NotReady", "Infrastructure", TicketState.COMPLETED.value, "P1", "diego.infra@example.com", "Platform"),
+        ("INC1007", "Phishing report triage", "Security", TicketState.CLOSED.value, "P2", "elena.sec@example.com", "SecOps"),
+        ("INC1008", "Printer offline in HQ floor 3", "Hardware", TicketState.ASSIGNED.value, "P3", "sam.desktop@example.com", "Desktop Team"),
+        ("INC1009", "DNS resolution intermittent", "Network", TicketState.WORK_IN_PROGRESS.value, "P1", "john@example.com", "Infrastructure"),
+        ("INC1010", "Slow Salesforce page loads", "Application", TicketState.NEW.value, "P3", "chloe.apps@example.com", "App Support"),
+    ]
+    rows = []
+    for number, title, category, state, priority, assignee, group in samples:
+        closed = state in {
+            TicketState.RESOLVED.value,
+            TicketState.COMPLETED.value,
+            TicketState.CLOSED.value,
+        }
+        rows.append(
+            TicketModel(
+                id=str(uuid4()),
+                number=number,
+                short_description=title,
+                description=f"Demo ticket: {title}",
+                category=category,
+                subcategory="",
+                state=state,
+                priority=priority,
+                assignment_group=group,
+                assigned_to=assignee,
+                caller="admin@example.com",
+                ai_confidence=0.82,
+                ai_summary=f"Demo summary for {title}",
+                root_cause_suggestion="",
+                sla_due_at=now + timedelta(hours={"P1": 2, "P2": 4, "P3": 6}[priority]),
+                sla_breached=False,
+                work_notes=[],
+                comments=[],
+                attachments=[],
+                audit_logs=[],
+                embeddings=[],
+                knowledge_links=[],
+                related_incidents=[],
+                ticket_metadata={"demo": True},
+                created_at=now,
+                updated_at=now,
+                resolved_at=now if closed else None,
+                closed_at=now if state in {TicketState.COMPLETED.value, TicketState.CLOSED.value} else None,
+            )
+        )
+    db.add_all(rows)
+    await db.commit()
 
 
 async def ensure_demo_engineers(db: AsyncSession) -> None:

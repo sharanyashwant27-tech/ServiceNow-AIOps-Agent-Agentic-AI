@@ -3,6 +3,13 @@ import { useParams } from "react-router-dom";
 import ActivityNotesViewer from "../components/ActivityNotesViewer";
 import { api } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
+import {
+  formatDate,
+  ticketAssignment,
+  ticketCompletedAt,
+  ticketCreatedAt,
+  ticketStatus,
+} from "../utils/dates";
 
 const STATES = [
   "New",
@@ -104,6 +111,16 @@ export default function TicketDetailPage() {
         <h1>
           {ticket.number} · {ticket.title || ticket.short_description}
         </h1>
+        <p>
+          <span className="status-chip">{ticketStatus(ticket)}</span>
+          {" · "}
+          <span className={`pill p-${ticket.priority}`}>{ticket.priority}</span>
+          {" · "}
+          {ticketAssignment(ticket)}
+          {" · created "}
+          {formatDate(ticketCreatedAt(ticket))}
+          {ticketCompletedAt(ticket) ? ` · completed ${formatDate(ticketCompletedAt(ticket))}` : ""}
+        </p>
         <p>{ticket.ai_summary}</p>
       </header>
 
@@ -121,14 +138,16 @@ export default function TicketDetailPage() {
             </div>
             <div>
               <dt>status</dt>
-              <dd>{ticket.status || ticket.state}</dd>
+              <dd>
+                <span className="status-chip">{ticketStatus(ticket)}</span>
+              </dd>
             </div>
             <div>
               <dt>priority / resolution_due</dt>
               <dd>
                 {ticket.priority} ·{" "}
-                {(ticket.resolution_due || ticket.sla_due_at)
-                  ? new Date(ticket.resolution_due || ticket.sla_due_at).toLocaleString()
+                {ticket.resolution_due || ticket.sla_due_at
+                  ? formatDate(ticket.resolution_due || ticket.sla_due_at)
                   : "—"}
               </dd>
             </div>
@@ -139,17 +158,28 @@ export default function TicketDetailPage() {
               </dd>
             </div>
             <div>
+              <dt>assignment</dt>
+              <dd>{ticketAssignment(ticket)}</dd>
+            </div>
+            <div>
               <dt>assigned_to</dt>
               <dd>{ticket.assigned_to || "Unassigned"}</dd>
             </div>
             <div>
-              <dt>created_by / created_date</dt>
-              <dd>
-                {ticket.created_by || ticket.caller} ·{" "}
-                {ticket.created_date || ticket.created_at
-                  ? new Date(ticket.created_date || ticket.created_at).toLocaleString()
-                  : "—"}
-              </dd>
+              <dt>assignment_group</dt>
+              <dd>{ticket.assignment_group || "—"}</dd>
+            </div>
+            <div>
+              <dt>created_by</dt>
+              <dd>{ticket.created_by || ticket.caller || "—"}</dd>
+            </div>
+            <div>
+              <dt>created_date</dt>
+              <dd>{formatDate(ticketCreatedAt(ticket))}</dd>
+            </div>
+            <div>
+              <dt>completed_date</dt>
+              <dd>{formatDate(ticketCompletedAt(ticket))}</dd>
             </div>
             <div>
               <dt>sla</dt>

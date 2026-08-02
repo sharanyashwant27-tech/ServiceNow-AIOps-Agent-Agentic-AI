@@ -46,6 +46,12 @@ def _serialize_ticket(t: TicketModel) -> dict[str, Any]:
     knowledge_links = list(getattr(t, "knowledge_links", None) or [])
     related_incidents = list(getattr(t, "related_incidents", None) or [])
     sla = _sla_payload(t)
+    completed = t.closed_at or t.resolved_at
+    assignment_label = (
+        f"{t.assigned_to} · {t.assignment_group}".strip(" ·")
+        if t.assigned_to and t.assignment_group
+        else (t.assigned_to or t.assignment_group or "Unassigned")
+    )
     return {
         # Canonical Ticket entity
         "id": t.id,
@@ -56,8 +62,11 @@ def _serialize_ticket(t: TicketModel) -> dict[str, Any]:
         "category": t.category,
         "subcategory": t.subcategory,
         "assigned_to": t.assigned_to,
+        "assignment_group": t.assignment_group,
+        "assignment": assignment_label,
         "created_by": t.caller,
         "created_date": t.created_at,
+        "completed_date": completed,
         "resolution_due": t.sla_due_at,
         "work_notes": t.work_notes or [],
         "attachments": attachments,
@@ -70,7 +79,6 @@ def _serialize_ticket(t: TicketModel) -> dict[str, Any]:
         "number": t.number,
         "short_description": t.short_description,
         "state": t.state,
-        "assignment_group": t.assignment_group,
         "configuration_item": t.configuration_item,
         "caller": t.caller,
         "ai_confidence": t.ai_confidence,
@@ -91,7 +99,22 @@ def _serialize_ticket(t: TicketModel) -> dict[str, Any]:
         "updated_at": t.updated_at,
         "resolved_at": t.resolved_at,
         "closed_at": t.closed_at,
+        # Explicit ISO-Z strings so browsers don't mis-parse naive datetimes as local time
+        "created_date_iso": _iso_z(t.created_at),
+        "completed_date_iso": _iso_z(completed),
+        "resolved_at_iso": _iso_z(t.resolved_at),
+        "closed_at_iso": _iso_z(t.closed_at),
     }
+
+
+def _iso_z(dt: datetime | None) -> str | None:
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    return dt.isoformat().replace("+00:00", "Z")
 
 
 def _activity_note(author: str, body: str, at: datetime | None = None) -> dict[str, Any]:
@@ -980,7 +1003,50 @@ class TicketService:
             )
         engineer_perf.sort(key=lambda x: (x["closed"], x["assigned"]), reverse=True)
 
+        # Full inventory: every status + every priority (all created tickets)
+        from app.domain.ticket_status import STATUS_ORDER
+
+        status_counts = {s: 0 for s in STATUS_ORDER}
+        for t in tickets:
+            status_counts[t.state] = status_counts.get(t.state, 0) + 1
+        priority_counts = {"P1": 0, "P2": 0, "P3": 0}
+        for t in tickets:
+            if t.priority in priority_counts:
+                priority_counts[t.priority] += 1
+            else:
+                priority_counts[t.priority] = priority_counts.get(t.priority, 0) + 1
+
+        # Status × Priority matrix
+        status_priority_matrix: list[dict[str, Any]] = []
+        for status in STATUS_ORDER:
+            row: dict[str, Any] = {"status": status, "total": status_counts.get(status, 0)}
+            for pri in ("P1", "P2", "P3"):
+                row[pri] = sum(1 for t in tickets if t.state == status and t.priority == pri)
+            status_priority_matrix.append(row)
+
+        by_status_cards = [
+            {
+                "id": f"status_{status.lower().replace(' ', '_')}",
+                "title": status,
+                "value": status_counts.get(status, 0),
+                "kind": "status",
+                "filter": status,
+            }
+            for status in STATUS_ORDER
+        ]
+        by_priority_cards = [
+            {
+                "id": f"priority_{pri.lower()}",
+                "title": f"{pri} Tickets",
+                "value": priority_counts.get(pri, 0),
+                "kind": "priority",
+                "filter": pri,
+            }
+            for pri in ("P1", "P2", "P3")
+        ]
+
         ticket_dashboard = {
+            "tickets_created": len(tickets),
             "open_tickets": len(open_tickets),
             "p1_tickets": open_p1,
             "p2_tickets": open_p2,
@@ -991,6 +1057,9 @@ class TicketService:
             "average_resolution_time_label": (
                 f"{avg_resolution_hours:.1f}h" if resolution_hours else "—"
             ),
+            "by_status": status_counts,
+            "by_priority": priority_counts,
+            "status_priority_matrix": status_priority_matrix,
             "agent_performance": {
                 "agents": agent_stats,
                 "average_ai_confidence": round(sum(confidences) / len(confidences), 4) if confidences else 0,
@@ -1005,6 +1074,7 @@ class TicketService:
                 ),
             },
             "cards": [
+                {"id": "tickets_created", "title": "Tickets Created", "value": len(tickets)},
                 {"id": "open_tickets", "title": "Open Tickets", "value": len(open_tickets)},
                 {"id": "p1_tickets", "title": "P1 Tickets", "value": open_p1},
                 {"id": "p2_tickets", "title": "P2 Tickets", "value": open_p2},
@@ -1021,6 +1091,31 @@ class TicketService:
                     "title": "Agent Performance",
                     "value": f"{round((sum(confidences) / len(confidences) * 100) if confidences else 0)}%",
                 },
+            ],
+            "status_cards": by_status_cards,
+            "priority_cards": by_priority_cards,
+            "recent_tickets": [
+                {
+                    "id": t.id,
+                    "number": t.number,
+                    "title": t.short_description,
+                    "status": t.state,
+                    "priority": t.priority,
+                    "assignment": (
+                        f"{t.assigned_to} · {t.assignment_group}".strip(" ·")
+                        if t.assigned_to and t.assignment_group
+                        else (t.assigned_to or t.assignment_group or "Unassigned")
+                    ),
+                    "assigned_to": t.assigned_to,
+                    "assignment_group": t.assignment_group,
+                    "created_date": t.created_at,
+                    "completed_date": t.closed_at or t.resolved_at,
+                }
+                for t in sorted(
+                    tickets,
+                    key=lambda x: x.created_at or datetime.min.replace(tzinfo=timezone.utc),
+                    reverse=True,
+                )[:12]
             ],
         }
 
