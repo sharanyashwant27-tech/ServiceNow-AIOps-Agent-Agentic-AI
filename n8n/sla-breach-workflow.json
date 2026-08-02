@@ -1,0 +1,112 @@
+{
+  "name": "AIOps SLA Breach",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 5 }]
+        }
+      },
+      "id": "cron",
+      "name": "Cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.AIOPS_API}}/api/v1/automation/sla-breach-workflow/run",
+        "authentication": "genericCredentialType"
+      },
+      "id": "find_expired",
+      "name": "Find Expired SLA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [260, 0],
+      "notes": "Full chain: Find Expired SLA → Notify Manager → Escalate → Create RCA Task runs in AIOps"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.processed_count}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "has_breaches",
+      "name": "Has Breaches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "aiops@example.com",
+        "toEmail": "ops.manager@example.com",
+        "subject": "=[AIOps] SLA Breach sweep {{$json.processed_count}} ticket(s)",
+        "text": "=Notify Manager / Escalate / RCA tasks completed.\n{{JSON.stringify($json.tickets, null, 2)}}"
+      },
+      "id": "notify_manager",
+      "name": "Notify Manager",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [780, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SLACK_WEBHOOK_URL}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify({ text: `SLA Breach: escalated ${$json.processed_count} ticket(s), RCA tasks created` })}}"
+      },
+      "id": "escalate_note",
+      "name": "Escalate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1040, -80]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO sla_breach_log(run_id, processed_count, payload, created_at) VALUES ('{{$json.run_id}}', {{$json.processed_count}}, '{{JSON.stringify($json)}}', NOW());"
+      },
+      "id": "rca_log",
+      "name": "Create RCA Task",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1300, -80],
+      "notes": "RCA tasks are created inside AIOps; this node logs the sweep"
+    }
+  ],
+  "connections": {
+    "Cron": {
+      "main": [[{ "node": "Find Expired SLA", "type": "main", "index": 0 }]]
+    },
+    "Find Expired SLA": {
+      "main": [[{ "node": "Has Breaches?", "type": "main", "index": 0 }]]
+    },
+    "Has Breaches?": {
+      "main": [
+        [
+          { "node": "Notify Manager", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Notify Manager": {
+      "main": [[{ "node": "Escalate", "type": "main", "index": 0 }]]
+    },
+    "Escalate": {
+      "main": [[{ "node": "Create RCA Task", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "description": "SLA Breach: Cron → Find Expired SLA → Notify Manager → Escalate → Create RCA Task"
+  }
+}

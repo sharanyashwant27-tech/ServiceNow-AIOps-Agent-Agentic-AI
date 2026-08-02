@@ -1,0 +1,26 @@
+{
+  "title": "ServiceNow AIOps Overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Tickets Created",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "targets": [{ "expr": "aiops_tickets_created_total", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Escalations",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "targets": [{ "expr": "aiops_escalations_total", "refId": "B" }]
+    },
+    {
+      "type": "stat",
+      "title": "RAG Queries",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "targets": [{ "expr": "aiops_rag_queries_total", "refId": "C" }]
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "name": "AIOps Ticket Created",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aiops",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Ticket Created : Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "aiops-ticket-created"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.AIOPS_API}}/api/v1/stack/agents/classify",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "short_description",
+              "value": "={{$json.data.short_description || $json.data.title}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$json.data.description}}"
+            }
+          ]
+        }
+      },
+      "id": "classify",
+      "name": "AI Classification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.AIOPS_API}}/api/v1/stack/agents/priority",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "short_description",
+              "value": "={{$json.data.short_description || $json.data.title}}"
+            }
+          ]
+        }
+      },
+      "id": "priority",
+      "name": "Priority",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [520, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.AIOPS_API}}/api/v1/stack/agents/assign",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "skill_domain",
+              "value": "={{$json.output?.subcategory || 'General'}}"
+            }
+          ]
+        }
+      },
+      "id": "assignment",
+      "name": "Assignment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [780, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SERVICENOW_URL}}/api/now/table/incident",
+        "authentication": "genericCredentialType",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify({ short_description: $json.data?.short_description, description: $json.data?.description, urgency: $json.data?.priority === 'P1' ? '1' : ($json.data?.priority === 'P2' ? '2' : '3') })}}"
+      },
+      "id": "servicenow",
+      "name": "ServiceNow API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1040, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "aiops@example.com",
+        "toEmail": "={{$json.data?.assigned_to || 'ops@example.com'}}",
+        "subject": "=[AIOps] Ticket Created {{$json.data?.number}}",
+        "text": "=P{{$json.data?.priority}} Ticket Created\nAssigned To: {{$json.data?.assigned_to}}\n"
+      },
+      "id": "email",
+      "name": "Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1300, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SLACK_WEBHOOK_URL}}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{JSON.stringify({ text: `Ticket Created ${$json.data?.number || ''} · ${$json.data?.priority || ''}` })}}"
+      },
+      "id": "slack",
+      "name": "Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_workflow_log(event, ticket_number, payload, created_at) VALUES ('ticket.created', '{{$json.data.number}}', '{{JSON.stringify($json)}}', NOW());"
+      },
+      "id": "log_db",
+      "name": "Log Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1820, 0]
+    }
+  ],
+  "connections": {
+    "Ticket Created : Webhook": {
+      "main": [[{ "node": "AI Classification", "type": "main", "index": 0 }]]
+    },
+    "AI Classification": {
+      "main": [[{ "node": "Priority", "type": "main", "index": 0 }]]
+    },
+    "Priority": {
+      "main": [[{ "node": "Assignment", "type": "main", "index": 0 }]]
+    },
+    "Assignment": {
+      "main": [[{ "node": "ServiceNow API", "type": "main", "index": 0 }]]
+    },
+    "ServiceNow API": {
+      "main": [[{ "node": "Email", "type": "main", "index": 0 }]]
+    },
+    "Email": {
+      "main": [[{ "node": "Slack", "type": "main", "index": 0 }]]
+    },
+    "Slack": {
+      "main": [[{ "node": "Log Database", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "AIOps Ticket Created: Webhook → AI Classification → Priority → Assignment → ServiceNow API → Email → Slack → Log Database"
+  }
+}

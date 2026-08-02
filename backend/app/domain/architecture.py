@@ -1,0 +1,151 @@
+"""Canonical system architecture for the ServiceNow Agentic AIOps platform."""
+
+from __future__ import annotations
+
+ARCHITECTURE = {
+    "name": "ServiceNow Agentic AIOps",
+    "layers": [
+        {"id": "users", "title": "Users", "description": "IT operators, engineers, and service managers"},
+        {
+            "id": "portal",
+            "title": "React Service Portal",
+            "description": "Dashboards, ticket lifecycle, automation, knowledge & GraphRAG UI",
+            "tech": ["React.js", "Vite"],
+        },
+        {
+            "id": "api",
+            "title": "FastAPI Backend",
+            "description": "JWT auth, REST APIs, Clean Architecture / DDD application services",
+            "tech": ["Python", "FastAPI", "JWT"],
+        },
+        {
+            "id": "master_agent",
+            "title": "Master AI Agent",
+            "description": "LangGraph orchestrator coordinating specialized sub-agents",
+            "tech": ["LangGraph", "CrewAI/AutoGen facade"],
+        },
+        {
+            "id": "sub_agents",
+            "title": "Specialized Agents",
+            "agents": [
+                {
+                    "id": "ticket_classification",
+                    "name": "Sub Agent 1 — Ticket Classification Agent",
+                    "detects": ["Incident", "Service Request", "Change Request", "Problem", "Security Issue"],
+                    "example": {"input": "VPN not working", "output": {"category": "Incident", "subcategory": "Network", "confidence": "98%+"}},
+                },
+                {
+                    "id": "priority",
+                    "name": "Sub Agent 2 — Priority Agent",
+                    "levels": {
+                        "P1": {"label": "Critical Production Down", "resolution_time": "2 Hours"},
+                        "P2": {"label": "Major Business Impact", "resolution_time": "4 Hours"},
+                        "P3": {"label": "Minor Issue", "resolution_time": "6 Hours"},
+                    },
+                    "example": {"input": "Email server down", "output": "P1"},
+                },
+                {
+                    "id": "assignment",
+                    "name": "Sub Agent 3 — Assignment Agent",
+                    "uses": ["Skill Matching", "Current workload", "Availability", "Shift", "Team", "Experience"],
+                    "example": {"input": "Network Issue", "output": {"assign": "John", "team": "Infrastructure"}},
+                },
+                {
+                    "id": "duplicate_detection",
+                    "name": "Sub Agent 4 — Duplicate Detection Agent",
+                    "uses": ["embeddings", "vector database"],
+                    "threshold": "90%",
+                    "action": "Link existing ticket instead of creating new",
+                },
+                {
+                    "id": "resolution",
+                    "name": "Sub Agent 5 — Resolution Agent (RAG)",
+                    "searches": ["Previous tickets", "KB articles", "PDFs", "SOP documents", "Runbooks"],
+                    "returns": ["Suggested Resolution", "Confidence", "References"],
+                },
+                {
+                    "id": "graphrag",
+                    "name": "Sub Agent 6 — GraphRAG Agent",
+                    "uses": "Neo4j",
+                    "example_chain": ["Server-A", "Application-B", "Database-C", "Storage-D", "Network-Switch-E"],
+                    "predicts": "Affected services when a CI fails",
+                },
+                {
+                    "id": "sla",
+                    "name": "Sub Agent 7 — SLA Agent",
+                    "timers": {"P1": "2 Hours", "P2": "4 Hours", "P3": "6 Hours"},
+                    "escalates": "30 minutes before breach",
+                },
+                {
+                    "id": "notification",
+                    "name": "Sub Agent 8 — Notification Agent",
+                    "channels": ["Email", "Slack", "Teams", "SMS"],
+                    "example": {"event": "P1 Ticket Created", "assigned_to": "John", "eta": "2 Hours"},
+                },
+            ],
+        },
+        {
+            "id": "rag_engine",
+            "title": "RAG Engine",
+            "description": "LangChain retrieval + LLM synthesis over historical incidents and KB",
+            "tech": ["LangChain", "LLM (GPT/Claude/Llama)"],
+        },
+        {
+            "id": "data_plane",
+            "title": "Vector DB + Neo4j GraphRAG",
+            "description": "Semantic search and CI dependency / blast-radius analysis",
+            "tech": ["Qdrant/Milvus/Pinecone", "Neo4j"],
+        },
+        {
+            "id": "servicenow",
+            "title": "ServiceNow Database",
+            "description": "System of record via ServiceNow REST + local operational store",
+            "tech": ["ServiceNow REST API", "PostgreSQL"],
+        },
+        {
+            "id": "n8n",
+            "title": "n8n Workflow",
+            "description": "Event-driven automation for create/escalate/notify pipelines",
+            "tech": ["n8n"],
+        },
+        {
+            "id": "channels",
+            "title": "Notification Channels",
+            "description": "Outbound engineer and stakeholder messaging",
+            "channels": ["Email", "Slack", "Teams", "SMS"],
+        },
+    ],
+    "flow": [
+        "Users → React Service Portal",
+        "React Service Portal → FastAPI Backend",
+        "FastAPI Backend → Master AI Agent",
+        "Master AI Agent → Sub Agents 1–8",
+        "Specialized Agents → RAG Engine",
+        "RAG Engine → Vector DB + Neo4j GraphRAG",
+        "Platform ↔ ServiceNow Database",
+        "Events → n8n Workflow",
+        "Notification Agent → Email | Slack | Teams | SMS",
+    ],
+    "ticket_workflow": [
+        "User",
+        "Raise Ticket",
+        "Master Agent",
+        "Classification Agent",
+        "Priority Agent",
+        "Duplicate Check",
+        "Assignment Agent",
+        "Knowledge Search",
+        "GraphRAG Analysis",
+        "Create ServiceNow Ticket",
+        "Notify Engineer",
+    ],
+    "ticket_status": [
+        "NEW",
+        "ASSIGNED",
+        "WORK IN PROGRESS",
+        "WAITING FOR CUSTOMER",
+        "RESOLVED",
+        "COMPLETED",
+        "CLOSED",
+    ],
+}

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.db
+.pytest_cache/
+.mypy_cache/
+node_modules/
+frontend/dist/
+.DS_Store
+*.log
+.idea/
+.vscode/
+backend/aiops.db
